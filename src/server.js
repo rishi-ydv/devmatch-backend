@@ -1,7 +1,7 @@
 //Environment Config Import
-import config from './config/enviroment.config.js';
+import config from './configs/enviroment.config.js';
 import app from './app.js';
-import connectDB from './config/database.config.js';
+import connectDB from './configs/database.config.js';
 
 const startServer = async () => {
   try {
