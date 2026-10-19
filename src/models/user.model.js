@@ -1,11 +1,12 @@
 import mongoose, { Schema } from 'mongoose';
 import validator from 'validator';
+import bcrypt from 'bcrypt';
 
 const userSchema = new Schema(
   {
     firstName: {
       type: String,
-      required: [true, "First name is required"],
+      required: [true, 'First name is required'],
       minLength: 2,
       maxLength: 50,
       trim: true,
@@ -18,7 +19,7 @@ const userSchema = new Schema(
     },
     emailId: {
       type: String,
-      required: [true, "EmailId is required"],
+      required: [true, 'EmailId is required'],
       unique: true,
       lowercase: true,
       trim: true,
@@ -29,7 +30,7 @@ const userSchema = new Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: [true, 'Password is required'],
       validate: {
         validator: value => validator.isStrongPassword(value),
         message:
@@ -46,7 +47,7 @@ const userSchema = new Schema(
     },
     gender: {
       type: String,
-      required: [true, "Gender is required"],
+      required: [true, 'Gender is required'],
       trim: true,
       enum: {
         values: ['male', 'female', 'other'],
@@ -133,6 +134,17 @@ const userSchema = new Schema(
         maxLength: [100, 'Country cannot exceed 100 characters.'],
       },
     },
+    refreshToken: {
+      type: String,
+    },
   },
   { timestamps: true },
 );
+
+// Hash the password before saving the user document if the password has been modified.
+userSchema.pre('save', async function () {
+  // Hash only when the password has been modified
+  if (!this.isModified('password')) return;
+
+  this.password = await bcrypt.hash(this.password, 10);
+});
