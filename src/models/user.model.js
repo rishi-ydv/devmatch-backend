@@ -5,7 +5,7 @@ const userSchema = new Schema(
   {
     firstName: {
       type: String,
-      required: true,
+      required: [true, "First name is required"],
       minLength: 2,
       maxLength: 50,
       trim: true,
@@ -18,7 +18,7 @@ const userSchema = new Schema(
     },
     emailId: {
       type: String,
-      required: true,
+      required: [true, "EmailId is required"],
       unique: true,
       lowercase: true,
       trim: true,
@@ -29,7 +29,7 @@ const userSchema = new Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: [true, "Password is required"],
       validate: {
         validator: value => validator.isStrongPassword(value),
         message:
@@ -46,7 +46,7 @@ const userSchema = new Schema(
     },
     gender: {
       type: String,
-      required: true,
+      required: [true, "Gender is required"],
       trim: true,
       enum: {
         values: ['male', 'female', 'other'],
