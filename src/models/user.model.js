@@ -1,5 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import validator from 'validator';
+import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 
 const userSchema = new Schema(
@@ -47,7 +48,6 @@ const userSchema = new Schema(
     },
     gender: {
       type: String,
-      required: [true, 'Gender is required'],
       trim: true,
       enum: {
         values: ['male', 'female', 'other'],
@@ -148,3 +148,33 @@ userSchema.pre('save', async function () {
 
   this.password = await bcrypt.hash(this.password, 10);
 });
+
+
+// Generate an access token for the current user.
+userSchema.methods.generateAccessToken = function () {
+  return jwt.sign(
+    { userId: this._id },
+    process.env.ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m',
+    },
+  );
+};
+
+// Generate a refresh token for the current user.
+userSchema.methods.generateRefreshToken = function () {
+  return jwt.sign(
+    { userId: this._id },
+    process.env.REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d',
+    },
+  );
+};
+
+
+
+
+const User = mongoose.model("User", userSchema);
+
+export default User;
