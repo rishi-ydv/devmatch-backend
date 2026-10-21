@@ -148,6 +148,10 @@ userSchema.pre('save', async function () {
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+// Password compare login check
+userSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
 
 // Generate an access token for the current user.
 userSchema.methods.generateAccessToken = function () {
