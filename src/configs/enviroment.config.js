@@ -7,10 +7,12 @@ dotenv.config();
 // and ensures a single source of truth across the app.
 const config = {
   port: process.env.PORT || 3000, // App port (default: 3000)
-  // jwtSecret: process.env.JWT_SECRET, // Secret for signing JWT tokens
-  // jwtExpires: process.env.JWT_EXPIRES_IN,
+  accessTokenSecret: process.env.ACCESS_TOKEN_SECRET,
+  accessTokenExpiry: process.env.ACCESS_TOKEN_EXPIRY,
+  refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET,
+  refreshTokenExpiry: process.env.REFRESH_TOKEN_EXPIRY,
   mongoURI: process.env.MONGODB_URI, // MongoDB connection URI
-  // nodeEnv: process.env.NODE_ENV,
+  nodeEnv: process.env.NODE_ENV,
   // cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
   // cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   // cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
