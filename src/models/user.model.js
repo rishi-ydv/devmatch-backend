@@ -2,6 +2,7 @@ import mongoose, { Schema } from 'mongoose';
 import validator from 'validator';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import config from '../configs/enviroment.config.js';
 
 const userSchema = new Schema(
   {
@@ -32,6 +33,7 @@ const userSchema = new Schema(
     password: {
       type: String,
       required: [true, 'Password is required'],
+      select: false,
       validate: {
         validator: value => validator.isStrongPassword(value),
         message:
@@ -134,9 +136,6 @@ const userSchema = new Schema(
         maxLength: [100, 'Country cannot exceed 100 characters.'],
       },
     },
-    refreshToken: {
-      type: String,
-    },
   },
   { timestamps: true },
 );
@@ -149,32 +148,25 @@ userSchema.pre('save', async function () {
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+// Password compare login check
+userSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
 
 // Generate an access token for the current user.
 userSchema.methods.generateAccessToken = function () {
-  return jwt.sign(
-    { userId: this._id },
-    process.env.ACCESS_TOKEN_SECRET,
-    {
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m',
-    },
-  );
+  return jwt.sign({ userId: this._id }, config.accessTokenSecret, {
+    expiresIn: config.accessTokenExpiry || '15m',
+  });
 };
 
 // Generate a refresh token for the current user.
 userSchema.methods.generateRefreshToken = function () {
-  return jwt.sign(
-    { userId: this._id },
-    process.env.REFRESH_TOKEN_SECRET,
-    {
-      expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d',
-    },
-  );
+  return jwt.sign({ userId: this._id }, config.refreshTokenSecret, {
+    expiresIn: config.refreshTokenExpiry || '7d',
+  });
 };
 
-
-
-
-const User = mongoose.model("User", userSchema);
+const User = mongoose.model('User', userSchema);
 
 export default User;
