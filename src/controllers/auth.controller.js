@@ -1,4 +1,5 @@
 import User from '../models/user.model.js';
+import mongoose from 'mongoose';
 import ApiError from '../utils/api-error.js';
 import ApiResponse from '../utils/api-response.js';
 import jwt from 'jsonwebtoken';
