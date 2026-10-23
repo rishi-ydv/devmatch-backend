@@ -4,6 +4,7 @@ import RefreshToken from '../models/refresh-token.model.js';
 import { hashRefreshToken } from './token.utils.js';
 
 export const createSession = async ({
+  sessionId,
   userId,
   refreshToken,
   deviceName = 'Unknown device',
@@ -11,7 +12,6 @@ export const createSession = async ({
 }) => {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const sessionId = new mongoose.Types.ObjectId();
   const refreshTokenHash = hashRefreshToken(refreshToken);
 
   const mongoSession = await mongoose.startSession();

@@ -153,18 +153,32 @@ userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
-// Generate an access token for the current user.
-userSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ userId: this._id }, config.accessTokenSecret, {
-    expiresIn: config.accessTokenExpiry || '15m',
-  });
+// Generate an access token for a specific session.
+userSchema.methods.generateAccessToken = function (sessionId) {
+  return jwt.sign(
+    {
+      userId: this._id,
+      sessionId,
+    },
+    config.accessTokenSecret,
+    {
+      expiresIn: config.accessTokenExpiry || '15m',
+    },
+  );
 };
 
-// Generate a refresh token for the current user.
-userSchema.methods.generateRefreshToken = function () {
-  return jwt.sign({ userId: this._id }, config.refreshTokenSecret, {
-    expiresIn: config.refreshTokenExpiry || '7d',
-  });
+// Generate a refresh token for a specific session.
+userSchema.methods.generateRefreshToken = function (sessionId) {
+  return jwt.sign(
+    {
+      userId: this._id,
+      sessionId,
+    },
+    config.refreshTokenSecret,
+    {
+      expiresIn: config.refreshTokenExpiry || '7d',
+    },
+  );
 };
 
 const User = mongoose.model('User', userSchema);
