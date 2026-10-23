@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
-import  ApiError  from '../utils/api-error.js';
+import Session from '../models/session.model.js';
+import ApiError from '../utils/api-error.js';
 import config from '../configs/enviroment.config.js';
 
 export const verifyJWT = async (req, res, next) => {
@@ -20,9 +21,16 @@ export const verifyJWT = async (req, res, next) => {
     throw new ApiError(401, 'Invalid or expired access token');
   }
 
-  // 3. Ensure the token contains the expected user ID.
-  if (!decoded || typeof decoded !== 'object' || !decoded.userId) {
-    throw new ApiError(401, 'Invalid access token payload');
+  // 3. Find the active session belonging to this user.
+  const session = await Session.findOne({
+    _id: decoded.sessionId,
+    userId: decoded.userId,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!session) {
+    throw new ApiError(401, 'Session is invalid, revoked, or expired');
   }
 
   // 4. Find the user associated with the token.
@@ -32,8 +40,9 @@ export const verifyJWT = async (req, res, next) => {
     throw new ApiError(401, 'User no longer exists');
   }
 
-  // 5. Attach the authenticated user to the request.
+  // 5. Attach authenticated information to the request.
   req.user = user;
+  req.sessionId = session._id;
 
   // 6. Allow the request to continue.
   return next();
