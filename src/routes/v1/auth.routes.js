@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { signup, refreshAccessToken, login, getMe, logout } from '../../controllers/auth.controller.js';
+import {
+  signup,
+  refreshAccessToken,
+  login,
+  getMe,
+  logout,
+  logoutAll,
+} from '../../controllers/auth.controller.js';
 import { validate } from '../../middlewares/validate.middleware.js';
 import { signupSchema, loginSchema } from '../../validators/auth.validator.js';
 import { verifyJWT } from '../../middlewares/auth.middleware.js';
@@ -20,5 +27,8 @@ router.get('/me', verifyJWT, getMe);
 
 // POST /api/v1/auth/logout
 router.post('/logout', verifyJWT, logout);
+
+// POST /api/v1/auth/logout-all
+router.post('/logout-all', verifyJWT, logoutAll);
 
 export default router;

@@ -107,3 +107,44 @@ export const revokeSessionAndRefreshTokens = async ({ sessionId, userId }) => {
     await mongoSession.endSession();
   }
 };
+
+export const revokeAllUserSessions = async userId => {
+  const mongoSession = await mongoose.startSession();
+  const now = new Date();
+
+  try {
+    await mongoSession.withTransaction(async () => {
+      // Revoke all active sessions belonging to this user.
+      await Session.updateMany(
+        {
+          userId,
+          revokedAt: null,
+        },
+        {
+          $set: { revokedAt: now },
+        },
+        { session: mongoSession },
+      );
+
+      // Revoke all refresh-token records belonging to this user
+      // that have not already been revoked.
+      await RefreshToken.updateMany(
+        {
+          userId,
+          status: { $ne: 'revoked' },
+        },
+        {
+          $set: {
+            status: 'revoked',
+            revokedAt: now,
+          },
+        },
+        { session: mongoSession },
+      );
+    });
+
+    return { success: true };
+  } finally {
+    await mongoSession.endSession();
+  }
+};
