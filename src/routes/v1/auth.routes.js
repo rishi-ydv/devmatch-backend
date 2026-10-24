@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, refreshAccessToken, login, getMe } from '../../controllers/auth.controller.js';
+import { signup, refreshAccessToken, login, getMe, logout } from '../../controllers/auth.controller.js';
 import { validate } from '../../middlewares/validate.middleware.js';
 import { signupSchema, loginSchema } from '../../validators/auth.validator.js';
 import { verifyJWT } from '../../middlewares/auth.middleware.js';
@@ -17,5 +17,8 @@ router.post('/refresh-token', refreshAccessToken);
 
 // GET /api/v1/auth/me
 router.get('/me', verifyJWT, getMe);
+
+// POST /api/v1/auth/logout
+router.post('/logout', verifyJWT, logout);
 
 export default router;

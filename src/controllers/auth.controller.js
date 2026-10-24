@@ -9,6 +9,7 @@ import {
   createSession,
   findRefreshTokenRecord,
   findActiveSession,
+  revokeSessionAndRefreshTokens,
 } from '../utils/session.utils.js';
 import { hashRefreshToken } from '../utils/token.utils.js';
 import { rotateRefreshToken } from '../utils/refresh-token.utils.js';
@@ -253,4 +254,23 @@ export const getMe = async (req, res) => {
       },
     }),
   );
+};
+
+export const logout = async (req, res) => {
+  await revokeSessionAndRefreshTokens({
+    sessionId: req.sessionId,
+    userId: req.user._id,
+  });
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: config.nodeEnv === 'production',
+    sameSite: 'strict',
+    path: '/',
+  };
+
+  res.clearCookie('accessToken', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
+
+  return res.status(200).json(new ApiResponse(200, 'Logged out successfully'));
 };
