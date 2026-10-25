@@ -294,3 +294,20 @@ export const logoutAll = async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, 'Logged out from all devices successfully'));
 };
+
+export const getActiveSessions = async (req, res) => {
+  const sessions = await Session.find({
+    userId: req.user._id,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  })
+    .select('_id deviceName ipAddress lastUsedAt createdAt')
+    .sort({ lastUsedAt: -1 })
+    .lean();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, 'Active sessions fetched successfully', sessions),
+    );
+};

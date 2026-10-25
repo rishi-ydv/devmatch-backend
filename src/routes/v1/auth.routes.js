@@ -6,6 +6,7 @@ import {
   getMe,
   logout,
   logoutAll,
+  getActiveSessions
 } from '../../controllers/auth.controller.js';
 import { validate } from '../../middlewares/validate.middleware.js';
 import { signupSchema, loginSchema } from '../../validators/auth.validator.js';
@@ -30,5 +31,8 @@ router.post('/logout', verifyJWT, logout);
 
 // POST /api/v1/auth/logout-all
 router.post('/logout-all', verifyJWT, logoutAll);
+
+// GET /api/v1/auth/sessions
+router.get('/sessions', verifyJWT, getActiveSessions);
 
 export default router;
