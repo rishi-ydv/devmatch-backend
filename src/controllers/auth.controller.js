@@ -311,3 +311,47 @@ export const getActiveSessions = async (req, res) => {
       new ApiResponse(200, 'Active sessions fetched successfully', sessions),
     );
 };
+
+export const revokeDeviceSession = async (req, res) => {
+  const { sessionId } = req.params;
+
+  // Validate the session ID before querying MongoDB.
+  if (!mongoose.isValidObjectId(sessionId)) {
+    throw new ApiError(400, 'Invalid session ID');
+  }
+
+  // Ensure the session belongs to the authenticated user.
+  const session = await Session.findOne({
+    _id: sessionId,
+    userId: req.user._id,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!session) {
+    throw new ApiError(404, 'Active session not found');
+  }
+
+  await revokeSessionAndRefreshTokens({
+    sessionId: session._id,
+    userId: req.user._id,
+  });
+
+  // If the user revokes the session used for this request,
+  // clear cookies on this device too.
+  if (session._id.equals(req.sessionId)) {
+    const cookieOptions = {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      path: '/',
+    };
+
+    res.clearCookie('accessToken', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Device session revoked successfully'));
+};

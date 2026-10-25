@@ -6,7 +6,8 @@ import {
   getMe,
   logout,
   logoutAll,
-  getActiveSessions
+  getActiveSessions,
+  revokeDeviceSession
 } from '../../controllers/auth.controller.js';
 import { validate } from '../../middlewares/validate.middleware.js';
 import { signupSchema, loginSchema } from '../../validators/auth.validator.js';
@@ -34,5 +35,8 @@ router.post('/logout-all', verifyJWT, logoutAll);
 
 // GET /api/v1/auth/sessions
 router.get('/sessions', verifyJWT, getActiveSessions);
+
+// DELETE /api/v1/auth/sessions/:sessionId
+router.delete('/sessions/:sessionId', verifyJWT, revokeDeviceSession);
 
 export default router;
