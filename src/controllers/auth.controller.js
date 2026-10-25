@@ -1,4 +1,5 @@
 import User from '../models/user.model.js';
+import mongoose from 'mongoose';
 import ApiError from '../utils/api-error.js';
 import ApiResponse from '../utils/api-response.js';
 import jwt from 'jsonwebtoken';
@@ -8,6 +9,8 @@ import {
   createSession,
   findRefreshTokenRecord,
   findActiveSession,
+  revokeSessionAndRefreshTokens,
+  revokeAllUserSessions,
 } from '../utils/session.utils.js';
 import { hashRefreshToken } from '../utils/token.utils.js';
 import { rotateRefreshToken } from '../utils/refresh-token.utils.js';
@@ -45,10 +48,11 @@ export const signup = async (req, res) => {
 The login flow:
   1. Find the user by emailId.
   2. Compare the submitted password with the stored password hash using bcrypt.compare().
-  3. Generate the access token and refresh token.
-  4. Create a new session using createSession().
-  5. Set the access and refresh tokens in secure cookies.
-  6. Return the user's public information, never their password or token hash.
+  3. Generate a one-time sessionId to use in both the accessToken and refreshToken, and then pass it into createSession.
+  4. Generate the access token and refresh token.
+  5. Create a new session using createSession().
+  6. Set the access and refresh tokens in secure cookies.
+  7. Return the user's public information, never their password or token hash.
 */
 export const login = async (req, res) => {
   const { emailId, password } = req.body;
@@ -67,19 +71,23 @@ export const login = async (req, res) => {
     throw new ApiError(401, 'Invalid credentials');
   }
 
-  // 3. Generate JWTs using methods defined in user.model.js.
-  const accessToken = user.generateAccessToken();
-  const refreshToken = user.generateRefreshToken();
+  // 3. Generate a one-time sessionId.
+  const sessionId = new mongoose.Types.ObjectId();
 
-  // 4. Create a session and persist the refresh-token hash.
+  // 4. Generate JWTs using methods defined in user.model.js.
+  const accessToken = user.generateAccessToken(sessionId);
+  const refreshToken = user.generateRefreshToken(sessionId);
+
+  // 5. Create a session and persist the refresh-token hash.
   await createSession({
+    sessionId,
     userId: user._id,
     refreshToken,
     deviceName: (req.get('User-Agent') || 'Unknown device').slice(0, 100),
     ipAddress: req.ip,
   });
 
-  // 5. Configure HTTP-only cookies.
+  // 6. Configure HTTP-only cookies.
   const cookieOptions = {
     httpOnly: true,
     secure: config.nodeEnv === 'production',
@@ -97,7 +105,7 @@ export const login = async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-  // 6. Return only public user information.
+  // 7. Return only public user information.
   return res.status(200).json(
     new ApiResponse(200, 'Login successful', {
       user: {
@@ -169,8 +177,11 @@ export const refreshAccessToken = async (req, res) => {
     throw new ApiError(401, 'Refresh token is no longer valid');
   }
 
-  // 5. Ensure the JWT identifies the same user as the record.
-  if (decoded.userId !== tokenRecord.userId.toString()) {
+  // 5. Ensure the JWT identifies the same user and session.
+  if (
+    decoded.userId !== tokenRecord.userId.toString() ||
+    decoded.sessionId !== tokenRecord.sessionId.toString()
+  ) {
     throw new ApiError(401, 'Invalid refresh token');
   }
 
@@ -195,9 +206,9 @@ export const refreshAccessToken = async (req, res) => {
     throw new ApiError(401, 'User no longer exists');
   }
 
-  // 9. Generate replacement JWTs using your existing model methods.
-  const newAccessToken = user.generateAccessToken();
-  const newRefreshToken = user.generateRefreshToken();
+  // 9. Generate replacement JWTs for the current device session.
+  const newAccessToken = user.generateAccessToken(session._id);
+  const newRefreshToken = user.generateRefreshToken(session._id);
 
   // 10. Atomically rotate the refresh token in MongoDB.
   await rotateRefreshToken({
@@ -244,4 +255,103 @@ export const getMe = async (req, res) => {
       },
     }),
   );
+};
+
+export const logout = async (req, res) => {
+  await revokeSessionAndRefreshTokens({
+    sessionId: req.sessionId,
+    userId: req.user._id,
+  });
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: config.nodeEnv === 'production',
+    sameSite: 'strict',
+    path: '/',
+  };
+
+  res.clearCookie('accessToken', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
+
+  return res.status(200).json(new ApiResponse(200, 'Logged out successfully'));
+};
+
+export const logoutAll = async (req, res) => {
+  await revokeAllUserSessions(req.user._id);
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: config.nodeEnv === 'production',
+    sameSite: 'strict',
+    path: '/',
+  };
+
+  // Clear the current device's cookies.
+  res.clearCookie('accessToken', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Logged out from all devices successfully'));
+};
+
+export const getActiveSessions = async (req, res) => {
+  const sessions = await Session.find({
+    userId: req.user._id,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  })
+    .select('_id deviceName ipAddress lastUsedAt createdAt')
+    .sort({ lastUsedAt: -1 })
+    .lean();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, 'Active sessions fetched successfully', sessions),
+    );
+};
+
+export const revokeDeviceSession = async (req, res) => {
+  const { sessionId } = req.params;
+
+  // Validate the session ID before querying MongoDB.
+  if (!mongoose.isValidObjectId(sessionId)) {
+    throw new ApiError(400, 'Invalid session ID');
+  }
+
+  // Ensure the session belongs to the authenticated user.
+  const session = await Session.findOne({
+    _id: sessionId,
+    userId: req.user._id,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!session) {
+    throw new ApiError(404, 'Active session not found');
+  }
+
+  await revokeSessionAndRefreshTokens({
+    sessionId: session._id,
+    userId: req.user._id,
+  });
+
+  // If the user revokes the session used for this request,
+  // clear cookies on this device too.
+  if (session._id.equals(req.sessionId)) {
+    const cookieOptions = {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      path: '/',
+    };
+
+    res.clearCookie('accessToken', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, 'Device session revoked successfully'));
 };
