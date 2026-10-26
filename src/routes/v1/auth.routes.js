@@ -7,10 +7,11 @@ import {
   logout,
   logoutAll,
   getActiveSessions,
-  revokeDeviceSession
+  revokeDeviceSession,
+  changePassword
 } from '../../controllers/auth.controller.js';
 import { validate } from '../../middlewares/validate.middleware.js';
-import { signupSchema, loginSchema } from '../../validators/auth.validator.js';
+import { signupSchema, loginSchema, changePasswordSchema } from '../../validators/auth.validator.js';
 import { verifyJWT } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
@@ -38,5 +39,13 @@ router.get('/sessions', verifyJWT, getActiveSessions);
 
 // DELETE /api/v1/auth/sessions/:sessionId
 router.delete('/sessions/:sessionId', verifyJWT, revokeDeviceSession);
+
+// POST /api/v1/auth/change-password
+router.post(
+  '/change-password',
+  verifyJWT,
+  validate(changePasswordSchema),
+  changePassword,
+);
 
 export default router;

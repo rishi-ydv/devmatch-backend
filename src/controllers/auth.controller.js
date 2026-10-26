@@ -355,3 +355,74 @@ export const revokeDeviceSession = async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, 'Device session revoked successfully'));
 };
+
+export const changePassword = async (req, res) => {
+  const { currentPassword, newPassword, logoutAllDevices } = req.body;
+
+  const mongoSession = await mongoose.startSession();
+
+  try {
+    await mongoSession.withTransaction(async () => {
+      // Find the authenticated user and include the password hash.
+      const user = await User.findById(req.user._id)
+        .select('+password')
+        .session(mongoSession);
+
+      if (!user) {
+        throw new ApiError(404, 'User not found');
+      }
+
+      // Verify the user's current password.
+      const isPasswordCorrect = await user.isPasswordCorrect(currentPassword);
+
+      if (!isPasswordCorrect) {
+        throw new ApiError(401, 'Current password is incorrect');
+      }
+
+      // Ensure the new password differs from the current password.
+      if (currentPassword === newPassword) {
+        throw new ApiError(
+          400,
+          'New password must differ from current password',
+        );
+      }
+
+      // Save the new password.
+      // The Mongoose pre-save hook hashes it automatically.
+      user.password = newPassword;
+      await user.save({ session: mongoSession });
+
+      // Revoke sessions only after the password update succeeds.
+      if (logoutAllDevices) {
+        // Revoke all sessions and their refresh-token records.
+        await revokeAllUserSessions(user._id, mongoSession);
+      } else {
+        // Revoke only the current session and its refresh tokens.
+        await revokeSessionAndRefreshTokens({
+          sessionId: req.sessionId,
+          userId: user._id,
+          mongoSession,
+        });
+      }
+    });
+  } finally {
+    await mongoSession.endSession();
+  }
+
+  // Clear the current device's cookies after the transaction succeeds.
+  const cookieOptions = {
+    httpOnly: true,
+    secure: config.nodeEnv === 'production',
+    sameSite: 'strict',
+    path: '/',
+  };
+
+  res.clearCookie('accessToken', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
+
+  const message = logoutAllDevices
+    ? 'Password changed successfully. All devices have been logged out.'
+    : 'Password changed successfully. This device has been logged out.';
+
+  return res.status(200).json(new ApiResponse(200, message));
+};
