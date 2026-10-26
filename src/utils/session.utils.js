@@ -66,14 +66,18 @@ export const findActiveSession = async sessionId => {
   });
 };
 
-export const revokeSessionAndRefreshTokens = async ({ sessionId, userId }) => {
-  const mongoSession = await mongoose.startSession();
+export const revokeSessionAndRefreshTokens = async ({
+  sessionId,
+  userId,
+  mongoSession: existingSession,
+}) => {
+  const mongoSession = existingSession ?? (await mongoose.startSession());
+  const ownsSession = !existingSession;
   const now = new Date();
 
   try {
-    await mongoSession.withTransaction(async () => {
-      // Revoke only the specified user's session.
-      await Session.updateOne(
+    const revoke = async () => {
+      const sessionResult = await Session.updateOne(
         {
           _id: sessionId,
           userId,
@@ -85,7 +89,11 @@ export const revokeSessionAndRefreshTokens = async ({ sessionId, userId }) => {
         { session: mongoSession },
       );
 
-      // Revoke all refresh-token records belonging to this session.
+      // Ensure the expected active session exists.
+      if (sessionResult.matchedCount !== 1) {
+        throw new ApiError(404, 'Active session not found');
+      }
+
       await RefreshToken.updateMany(
         {
           sessionId,
@@ -100,51 +108,55 @@ export const revokeSessionAndRefreshTokens = async ({ sessionId, userId }) => {
         },
         { session: mongoSession },
       );
-    });
+    };
+
+    if (ownsSession) {
+      await mongoSession.withTransaction(revoke);
+    } else {
+      await revoke();
+    }
 
     return { success: true };
   } finally {
-    await mongoSession.endSession();
+    if (ownsSession) {
+      await mongoSession.endSession();
+    }
   }
 };
 
-export const revokeAllUserSessions = async userId => {
-  const mongoSession = await mongoose.startSession();
+export const revokeAllUserSessions = async (userId, existingSession) => {
+  const mongoSession = existingSession ?? (await mongoose.startSession());
+  const ownsSession = !existingSession;
   const now = new Date();
 
   try {
-    await mongoSession.withTransaction(async () => {
-      // Revoke all active sessions belonging to this user.
+    const revoke = async () => {
       await Session.updateMany(
-        {
-          userId,
-          revokedAt: null,
-        },
-        {
-          $set: { revokedAt: now },
-        },
+        { userId, revokedAt: null },
+        { $set: { revokedAt: now } },
         { session: mongoSession },
       );
 
-      // Revoke all refresh-token records belonging to this user
-      // that have not already been revoked.
       await RefreshToken.updateMany(
         {
           userId,
           status: { $ne: 'revoked' },
         },
         {
-          $set: {
-            status: 'revoked',
-            revokedAt: now,
-          },
+          $set: { status: 'revoked', revokedAt: now },
         },
         { session: mongoSession },
       );
-    });
+    };
+
+    if (ownsSession) {
+      await mongoSession.withTransaction(revoke);
+    } else {
+      await revoke();
+    }
 
     return { success: true };
   } finally {
-    await mongoSession.endSession();
+    if (ownsSession) await mongoSession.endSession();
   }
 };
