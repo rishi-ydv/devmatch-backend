@@ -27,15 +27,48 @@ export const signupSchema = z
   })
   .strict();
 
+export const loginSchema = z
+  .object({
+    emailId: z
+      .string()
+      .trim()
+      .min(1, 'Email is required')
+      .email('Please provide a valid email address'),
 
-  export const loginSchema = z.object({
-  emailId: z
-    .string()
-    .trim()
-    .min(1, 'Email is required')
-    .email('Please provide a valid email address'),
+    password: z.string().min(1, 'Password is required'),
+  })
+  .strict();
 
-  password: z
-    .string()
-    .min(1, 'Password is required'),
-}).strict();
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+
+    newPassword: z
+      .string()
+      .min(1, 'New password is required')
+      .refine(
+        value => validator.isStrongPassword(value),
+        'New password must meet the password strength requirements',
+      ),
+
+    confirmPassword: z.string().min(1, 'Please confirm your new password'),
+
+    logoutAllDevices: z.boolean(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.newPassword === data.currentPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['newPassword'],
+        message: 'New password must differ from current password',
+      });
+    }
+
+    if (data.confirmPassword !== data.newPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['confirmPassword'],
+        message: 'Passwords do not match',
+      });
+    }
+  });
