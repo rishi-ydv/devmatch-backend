@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -13,9 +13,11 @@ const config = {
   refreshTokenExpiry: process.env.REFRESH_TOKEN_EXPIRY,
   mongoURI: process.env.MONGODB_URI, // MongoDB connection URI
   nodeEnv: process.env.NODE_ENV,
-  // cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
-  // cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
-  // cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  },
   // corsOrigins: process.env.CORS_ORIGINS,
 };
 
